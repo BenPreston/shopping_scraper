@@ -4,8 +4,18 @@ const fs = require("fs");
 
 // Define the URL and options for the fetch call
 const url = "https://www.waitrose.com/api/graphql-prod/graph/live";
-const totalRecordsToFetch = 2;
-const recordsPerFetch = 1;
+const totalRecordsToFetch = 20000;
+const recordsPerFetch = 100;
+const startVal = 0;
+
+let existingData = [];
+
+const generateFilename = (index) => {
+  return `waitroseData_${index}.json`;
+};
+
+// Moved the filename declaration to the outer scope
+const filename = generateFilename(startVal);
 
 // Basic fetch
 const fetchData = async (start, size) => {
@@ -44,91 +54,81 @@ const fetchData = async (start, size) => {
   return res.json();
 };
 
+const newSavedIds = new Set()
+const newDuplicateIds = new Set()
+const newNames = new Set()
+
+if (fs.existsSync(filename)) {
+  // Read existing data
+  const fileContent = fs.readFileSync(filename, 'utf8');
+  existingData = JSON.parse(fileContent);
+}
+
 // Transform and save the file
-const saveToFile = (data) => {
-  const finalProducts = []
+const saveToFile = (data, index) => {
+  const finalProducts = []  
+  const filename = generateFilename(index);
+  
   try {
-
     data.map(product => {
-
+      // Create a unique filename based on 'i'
+      
       console.log('product name: ', product?.searchProduct?.name)
-      // const filters = product.productGridData.criteria.filters
- 
-      // const getFilterAppliedValue = (filters, filterId) => {
-      //   const suitableFilter = filters.find(
-      //     filter => filter.filters[0].filterTag.id === filterId
-      //   );
-      //   return suitableFilter ? suitableFilter.filters[0].applied : false;
-      // };
-      
-      
-      // const isSuitableForNuts = getFilterAppliedValue(filters, "suitableforthoseavoidingnutsfilter");
-      // const isSuitableForVegans = getFilterAppliedValue(filters, "suitableforveganfilter");
-      // const isSuitableForVegetarians = getFilterAppliedValue(filters, "suitableforvegitarianfilter");
-      
+
+     // Make a random ID for each product similar to the format: 6ffa5071-1567-485b-a025-378fec3f7cae
+      const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+
+      // Check if the id has already been used and is stored in the set. If it has then don't add it to the finalProducts array
+      if (newSavedIds.has(product.searchProduct?.id)) {
+        newDuplicateIds.add(product.searchProduct?.id)
+        return;
+      }
+
+      if (newNames.has(product.searchProduct?.name)) {
+        newDuplicateIds.add(product.searchProduct?.name)
+        return;
+      }
+  
       const refinedProduct = {
-          "brand": product.searchProduct?.brand || 'unknown',
-          "price_amount": product.searchProduct?.currentSaleUnitPrice?.price?.amount || 'unknown',
-          "currencyCode": product.searchProduct?.currentSaleUnitPrice?.price?.currencyCode || 'unknown',
-          "quantity_amount": product.searchProduct?.currentSaleUnitPrice?.quantity?.amount || 'unknown',
-          "quantity_uom": product.searchProduct?.currentSaleUnitPrice?.quantity?.uom || 'unknown',
-          "displayPrice": product.searchProduct?.displayPrice || 'unknown',
-          "displayPriceQualifier": product.searchProduct?.displayPriceQualifier || 'unknown',
-          "id": product.searchProduct?.id || 'unknown',
-          "name": product.searchProduct?.name || 'unknown',
-          "productImageUrls_extraLarge": product.searchProduct?.productImageUrls?.extraLarge || 'unknown',
-          "productImageUrls_large": product.searchProduct?.productImageUrls?.large || 'unknown',
-          "productImageUrls_medium": product.searchProduct?.productImageUrls?.medium || 'unknown',
-          "productImageUrls_small": product.searchProduct?.productImageUrls?.small || 'unknown',
-          "promotions": product.searchProduct?.promotions || 'unknown', 
-          "reviews_averageRating": product.searchProduct?.reviews?.averageRating || 'unknown',
-          "reviews_reviewCount": product.searchProduct?.reviews?.reviewCount || 'unknown',
-          "size": product.searchProduct?.size || 'unknown',
-          "typicalWeight": product.searchProduct?.typicalWeight || 'unknown',
-          "servings": product.searchProduct?.servings || 'unknown',
-          // "allergies_nuts": isSuitableForNuts || 'unknown',
-          // "allergies_peanut": isSuitableForNuts || 'unknown',
-          "allergies_soya": false || 'unknown',
-          "allergies_wheat": false || 'unknown',
-          "lifestyleGoals_highFibre": false || 'unknown',
-          "lifestyleGoals_highProtein": false || 'unknown',
-          "lifestyleGoals_lowFat": false || 'unknown',
-          "lifestyleGoals_lowSalt": false || 'unknown',
-          "lifestyleGoals_lowSugar": false || 'unknown',
-          "lifestyleGoals_organic": false || 'unknown',
-          // "lifestyleGoals_vegan": isSuitableForVegans || 'unknown', 
-          // "lifestyleGoals_vegetarian": isSuitableForVegetarians || 'unknown',
-          "sustainabilityGoals_sustainablySourced": false || 'unknown',
-          "sustainabilityGoals_madeInTheUK": false || 'unknown',
-          "sustainabilityGoals_reducedPackaging": false || 'unknown',
-          // "searchTags": product.productGridData.criteria.searchTags || 'unknown',
-          // "suggestedSearchTags": product.productGridData.criteria.suggestedSearchTags || 'unknown',
-          "metaData": product.metaData || 'unknown',
+        "id": id,
+        "productType": "WaitroseType",  
+        "name.en": product.searchProduct?.name || 'unknown',
+        "name.en-GB": product.searchProduct?.name || 'unknown',
+        "brand": product.searchProduct?.brand || 'unknown',
+        "price_amount": product.searchProduct?.currentSaleUnitPrice?.price?.amount || 'unknown',
+        "currency_code": product.searchProduct.currentSaleUnitPrice.price.currencyCode,
+        "quantity_amount": product.searchProduct?.currentSaleUnitPrice?.quantity?.amount || 'unknown',
+        "quantity_uom": product.searchProduct?.currentSaleUnitPrice?.quantity?.uom || 'unknown',
+        "display_price": product.searchProduct?.displayPrice,
+        "display_price_qualifier": product.searchProduct?.displayPriceQualifier,
+        "product_id": product.searchProduct?.id || 'unknown',
+        "product_name": product.searchProduct?.name || 'unknown',
+        "product_image_url_xl": product.searchProduct?.productImageUrls?.extraLarge || 'unknown',
+        "product_image_url_l": product.searchProduct?.productImageUrls?.large || 'unknown',
+        "product_image_url_m": product.searchProduct?.productImageUrls?.medium || 'unknown',
+        "product_image_url_s": product.searchProduct?.productImageUrls?.small || 'unknown',
+        "reviews_average_rating": product.searchProduct?.reviews?.averageRating || 0,
+        "reviews_review_count": product.searchProduct?.reviews?.reviewCount || 0,
+        "size": product.searchProduct?.size || 'unknown',
+        "typical_weight": product.searchProduct?.typicalWeight || 'unknown',
+        "servings": product.searchProduct?.servings || 'unknown',
+        "metaData": product.metaData || 'unknown',
       }
 
       finalProducts.push(refinedProduct)
+      newSavedIds.add(product.searchProduct?.id)
+      newNames.add(product.searchProduct?.name)
     })
 
-  const filename = "output.json";
-  let existingData = [];
+// Filter out duplicates and append new data to the existing data
+const existingIds = new Set(existingData.map(entry => entry.id));
+const filteredProducts = finalProducts.filter(entry => !existingIds.has(entry.id));
+existingData.push(...filteredProducts);
 
-  // Check if the file exists
-  if (fs.existsSync(filename)) {
-    // Read existing data
-    const fileContent = fs.readFileSync(filename, 'utf8');
-    existingData = JSON.parse(fileContent);
-  }
+// Write the data back to the file
+fs.writeFileSync(filename, JSON.stringify(existingData, null, 2));
+console.log(`Data saved to ${filename}`);
 
-  // Add new data to existing data
-  existingData.push(finalProducts);
-
-  // Convert the data array to a JSON string with indentation
-  const dataString = JSON.stringify(existingData, null, 2);
-
-  // Write the data back to the file
-  fs.writeFileSync(filename, dataString);
-
-  console.log(`Data saved to ${filename}`);
 } catch (err) {
   console.error(`Error writing to file: ${err}`);
 }
@@ -136,11 +136,11 @@ const saveToFile = (data) => {
 
 
 const fetchAndSaveData = async () => {
-  for (let i = 0; i < totalRecordsToFetch; i+=recordsPerFetch) {
-        const data = await fetchData(i, recordsPerFetch);
-        const dataToEdit = data.data.getProductListPage.productGridData.componentsAndProducts
-        console.log(`fetch ${i}`)
-        saveToFile(dataToEdit);
+  for (let i = startVal; i < totalRecordsToFetch + startVal; i += recordsPerFetch) {
+    const data = await fetchData(i, recordsPerFetch);
+    const dataToEdit = data.data.getProductListPage.productGridData.componentsAndProducts;
+    console.log(`fetch ${i}`);
+    saveToFile(dataToEdit, i);
   }
 };
 
